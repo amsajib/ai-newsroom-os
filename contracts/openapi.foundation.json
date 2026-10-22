@@ -1,0 +1,346 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AI Newsroom OS API",
+    "version": "0.1.0",
+    "description": "Foundation contract draft; must be aligned with implementation before production."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "request_id",
+              "retryable"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object"
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "retryable": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "CreateCaseRequest": {
+        "type": "object",
+        "required": [
+          "title",
+          "submitted_context"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "submitted_context": {
+            "type": "string"
+          },
+          "source_notes": {
+            "type": "string"
+          },
+          "language_code": {
+            "type": "string",
+            "default": "bn"
+          },
+          "sensitivity_flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Case": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "status",
+          "language_code"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "queued",
+              "running",
+              "review_required",
+              "approved",
+              "publishing",
+              "published",
+              "publish_failed",
+              "blocked",
+              "cancelled"
+            ]
+          },
+          "language_code": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/cases": {
+      "get": {
+        "summary": "List accessible cases",
+        "responses": {
+          "200": {
+            "description": "Case list"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a case and initial revision",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCaseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created case"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/cases/{case_id}": {
+      "parameters": [
+        {
+          "name": "case_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Get case",
+        "responses": {
+          "200": {
+            "description": "Case"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update permitted case metadata",
+        "responses": {
+          "200": {
+            "description": "Updated"
+          },
+          "409": {
+            "description": "Revision conflict"
+          }
+        }
+      }
+    },
+    "/cases/{case_id}/workflows": {
+      "parameters": [
+        {
+          "name": "case_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Start workflow for a specific revision",
+        "responses": {
+          "202": {
+            "description": "Workflow queued"
+          },
+          "409": {
+            "description": "State/dependency conflict"
+          }
+        }
+      }
+    },
+    "/cases/{case_id}/claims": {
+      "parameters": [
+        {
+          "name": "case_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "List claim verification states",
+        "responses": {
+          "200": {
+            "description": "Claims"
+          }
+        }
+      }
+    },
+    "/cases/{case_id}/approvals": {
+      "parameters": [
+        {
+          "name": "case_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Approve/reject exact revision and draft hash",
+        "responses": {
+          "201": {
+            "description": "Decision recorded"
+          },
+          "409": {
+            "description": "Hash mismatch or invalid state"
+          }
+        }
+      }
+    },
+    "/cases/{case_id}/publish-jobs": {
+      "parameters": [
+        {
+          "name": "case_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Queue publishing after server-side approval validation",
+        "responses": {
+          "202": {
+            "description": "Queued"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Approval/hash/state mismatch"
+          }
+        }
+      }
+    },
+    "/publish-jobs/{publish_job_id}": {
+      "parameters": [
+        {
+          "name": "publish_job_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Get publication status and confirmed CMS result",
+        "responses": {
+          "200": {
+            "description": "Publish job"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/events/stream": {
+      "get": {
+        "summary": "Authorized SSE workflow updates",
+        "responses": {
+          "200": {
+            "description": "text/event-stream"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          }
+        }
+      }
+    }
+  }
+}
